@@ -1,0 +1,1215 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simuladores Chat GPON</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: teléfono con el chat a la izquierda, panel de control y mapa del flujo a la derecha; se apilan en móvil */
+:root{
+  --bg:#FFFFFB; --surface:#FFFFFF; --cream:#FFF1DC; --peach:#FFD2A6; --accent:#FF8500; --ink:#3D405B;
+  --muted:#6E7088; --line:#EADFCF; --chat:#FFF6E8; --bot:#FFFFFF; --user:#FFD2A6; --userInk:#3D405B;
+  --pill:#3D405B; --pillInk:#FFFFFB; --shadow:0 18px 40px -22px rgba(61,64,91,.45);
+  --font:"Poppins",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#16172A; --surface:#202238; --cream:#2A2C46; --peach:#7A4A1E; --accent:#FF8F1F; --ink:#F2EEE6;
+  --muted:#A9A8BC; --line:#34375A; --chat:#1B1C30; --bot:#282A44; --user:#6B3E14; --userInk:#FFF1DC;
+  --pill:#FFD2A6; --pillInk:#2A1A08; --shadow:0 18px 40px -22px rgba(0,0,0,.7); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#16172A; --surface:#202238; --cream:#2A2C46; --peach:#7A4A1E; --accent:#FF8F1F; --ink:#F2EEE6;
+  --muted:#A9A8BC; --line:#34375A; --chat:#1B1C30; --bot:#282A44; --user:#6B3E14; --userInk:#FFF1DC;
+  --pill:#FFD2A6; --pillInk:#2A1A08; --shadow:0 18px 40px -22px rgba(0,0,0,.7); color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;
+  padding-block:24px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1080px;margin:0 auto;display:grid;gap:24px}
+header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-bottom:3px solid var(--accent);padding-bottom:14px}
+.mark{width:44px;height:44px;border-radius:12px;background:var(--accent);color:#FFFFFB;display:grid;place-items:center;font-weight:700;font-size:22px;flex:none}
+header h1{margin:0;font-size:22px;font-weight:700;text-wrap:balance}
+header p{margin:2px 0 0;color:var(--muted);font-size:13px}
+header > div:last-child{flex:1 1 300px;min-width:0}
+.main{display:grid;grid-template-columns:minmax(0,400px) minmax(0,1fr);gap:28px;align-items:start}
+@media (max-width:820px){.main{grid-template-columns:minmax(0,1fr)}}
+
+/* Teléfono */
+.phone{background:var(--surface);border:1px solid var(--line);border-radius:28px;overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column;height:680px;max-height:82vh;position:relative}
+.top{background:var(--ink);color:var(--bg);display:flex;align-items:center;gap:10px;padding:12px 14px}
+:root[data-theme="dark"] .top{background:#0F1020;color:#F2EEE6}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .top{background:#0F1020;color:#F2EEE6}}
+.top .mark{width:36px;height:36px;font-size:17px;border-radius:50%}
+.top b{display:block;font-size:15px;font-weight:600}
+.top span{font-size:12px;opacity:.75}
+.chat{flex:1;overflow-y:auto;background:var(--chat);padding:14px 12px;display:flex;flex-direction:column;gap:8px}
+.msg{max-width:84%;padding:8px 11px 6px;border-radius:12px;line-height:1.45;font-size:13.5px;white-space:pre-line;animation:pop .18s ease-out;overflow-wrap:anywhere}
+.msg time{display:block;text-align:right;font-size:10.5px;color:var(--muted);margin-top:3px}
+.bot{align-self:flex-start;background:var(--bot);border-top-left-radius:3px;box-shadow:0 1px 0 var(--line)}
+.user{align-self:flex-end;background:var(--user);color:var(--userInk);border-top-right-radius:3px}
+.user time{color:inherit;opacity:.7}
+.listbtn{display:flex;justify-content:center;align-items:center;gap:6px;border:none;border-top:1px solid var(--line);background:none;color:var(--accent);font:600 13.5px var(--font);padding:9px 0 3px;margin-top:8px;width:100%;cursor:pointer}
+.listbtn:disabled{color:var(--muted);cursor:default}
+.pill{align-self:center;background:var(--pill);color:var(--pillInk);font-size:11.5px;font-weight:500;padding:5px 12px;border-radius:20px;text-align:center;max-width:92%;animation:pop .18s ease-out}
+.pill.warn{background:var(--accent);color:#FFFFFB}
+.typing{align-self:flex-start;background:var(--bot);border-radius:12px;padding:10px 14px;display:flex;gap:4px}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:blink 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes blink{50%{opacity:.25}}
+@keyframes pop{from{transform:translateY(4px);opacity:.4}}
+@media (prefers-reduced-motion: reduce){.msg,.pill{animation:none}.typing i{animation:none}}
+.compose{display:flex;gap:8px;padding:10px;background:var(--surface);border-top:1px solid var(--line)}
+.compose input{flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:22px;padding:10px 14px;font:13.5px var(--font)}
+.send{width:42px;height:42px;border-radius:50%;border:none;background:var(--accent);color:#FFFFFB;font-size:18px;cursor:pointer;flex:none}
+.timer{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--cream);font-size:12px;padding:7px 12px;font-variant-numeric:tabular-nums}
+.timer button{border:1px solid var(--accent);background:none;color:var(--accent);border-radius:14px;padding:3px 10px;font:500 11.5px var(--font);cursor:pointer}
+
+/* Hoja de opciones */
+.sheet{position:absolute;inset:0;background:rgba(20,20,35,.45);display:flex;align-items:flex-end}
+.sheet .card{background:var(--surface);width:100%;border-radius:18px 18px 0 0;padding:16px 18px 18px}
+.sheet h3{margin:0 0 8px;font-size:15px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.sheet h3 button{border:none;background:none;color:var(--muted);font-size:20px;cursor:pointer}
+.opt{display:flex;justify-content:space-between;align-items:center;padding:13px 2px;border-bottom:1px solid var(--line);cursor:pointer;font-size:14px}
+.opt input{accent-color:var(--accent);width:18px;height:18px}
+.sheet .go{margin-top:14px;width:100%;border:none;border-radius:22px;background:var(--accent);color:#FFFFFB;font:600 14px var(--font);padding:11px;cursor:pointer}
+.sheet .go:disabled{opacity:.4;cursor:default}
+
+/* Panel */
+.panel{display:grid;gap:18px;min-width:0}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+.box h2{margin:0 0 12px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.ctrls{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+label.f{display:grid;gap:5px;font-size:12.5px;color:var(--muted)}
+label.f input,label.f select{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:8px 10px;font:13.5px var(--font);font-variant-numeric:tabular-nums}
+.chk{display:flex;gap:7px;align-items:center;font-size:12.5px;color:var(--muted);margin-top:10px}
+.chk input{accent-color:var(--accent)}
+.status{margin-top:12px;font-size:13px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip{border-radius:20px;padding:3px 11px;font-size:12px;font-weight:600}
+.chip.in{background:var(--cream);color:var(--ink);border:1px solid var(--accent)}
+.chip.out{background:var(--pill);color:var(--pillInk)}
+.reset{border:1px solid var(--ink);background:none;color:var(--ink);border-radius:20px;padding:7px 16px;font:500 13px var(--font);cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Mapa del flujo */
+.flow{display:grid;gap:8px}
+.node{border:1.5px solid var(--line);border-radius:11px;padding:8px 12px;font-size:13px;color:var(--muted);transition:all .2s}
+.node b{display:block;color:var(--ink);font-weight:600;font-size:13px}
+.node.dec{border-style:dashed}
+.node.on{border-color:var(--accent);background:var(--cream);color:var(--ink)}
+.node.now{border-color:var(--accent);box-shadow:0 0 0 3px var(--peach)}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lane{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:4px 0 -2px}
+.note{font-size:12px;color:var(--muted);line-height:1.5;margin:0}
+
+#m-root .lanes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:560px){#m-root .lanes{grid-template-columns:minmax(0,1fr)}}
+#m-root .lanes .flow{align-content:start}
+#m-root .node.small{padding:6px 10px;font-size:12px}
+#m-root .node.small b{font-size:12px}
+#m-root .chips{display:flex;gap:6px;flex-wrap:wrap}
+
+#m-root .cost{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:13px;font-variant-numeric:tabular-nums}
+#m-root .cost b{display:block;font-size:22px;color:var(--accent);font-weight:700}
+
+
+#p-root .lanes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media (max-width:620px){#p-root .lanes{grid-template-columns:repeat(2,minmax(0,1fr))}}
+#p-root .lanes .flow{align-content:start}
+#p-root .node.small{padding:6px 9px;font-size:11.5px}
+#p-root .node.small b{font-size:12px}
+#p-root .chips{display:flex;gap:6px;flex-wrap:wrap}
+#p-root .cost{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:13px;font-variant-numeric:tabular-nums}
+#p-root .cost b{display:block;font-size:22px;color:var(--accent);font-weight:700}
+
+
+
+#o-root .lanes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:560px){#o-root .lanes{grid-template-columns:minmax(0,1fr)}}
+#o-root .lanes .flow{align-content:start}
+#o-root .node.small{padding:6px 10px;font-size:12px}
+#o-root .node.small b{font-size:12px}
+#o-root .chips{display:flex;gap:6px;flex-wrap:wrap}
+#o-root .cost{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:13px;font-variant-numeric:tabular-nums}
+#o-root .cost b{display:block;font-size:22px;color:var(--accent);font-weight:700}
+#o-root .listbtn + .listbtn{border-top:none;padding-top:3px;margin-top:0}
+
+
+
+#v-root .lanes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+#v-root .chips{display:flex;gap:6px;flex-wrap:wrap}
+@media (max-width:560px){#v-root .lanes{grid-template-columns:minmax(0,1fr)}}
+#v-root .lanes .flow{align-content:start}
+#v-root .node.small{padding:6px 9px;font-size:11.5px}
+#v-root .node.small b{font-size:12px}
+#v-root .cost{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:13px;font-variant-numeric:tabular-nums}
+#v-root .cost b{display:block;font-size:22px;color:var(--accent);font-weight:700}
+.tabs{max-width:1080px;margin:0 auto 18px;display:flex;gap:10px;flex-wrap:wrap}
+.tab{flex:1 1 220px;text-align:left;border:2px solid var(--line);background:var(--surface);color:var(--ink);border-radius:14px;padding:12px 16px;font:600 15px var(--font);cursor:pointer}
+.tab small{display:block;font-weight:400;font-size:12.5px;color:var(--muted);margin-top:2px}
+.tab[aria-selected="true"]{border-color:var(--accent);background:var(--cream)}
+</style>
+</head>
+<body>
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" id="tab-o" aria-selected="false" type="button">Flujo original (IVR)<small>Diagrama anterior · GponLover y Quiero tener Gpon</small></button>
+  <button class="tab" role="tab" id="tab-m" aria-selected="true" type="button">Flujo mixto<small>Atención, Pagos, Soporte y Ventas · 4 opciones</small></button>
+  <button class="tab" role="tab" id="tab-p" aria-selected="false" type="button">Flujo postventa<small>Solo ATC, Soporte y Pagos · 3 opciones</small></button>
+  <button class="tab" role="tab" id="tab-v" aria-selected="false" type="button">Flujo de ventas<small>Solo Casa y Empresa · 2 opciones</small></button>
+</div>
+<div class="wrap" id="m-root">
+  <header>
+    <div class="mark" aria-hidden="true">G</div>
+    <div>
+      <h1>Simulador del chat de WhatsApp · Gpon Internet</h1>
+      <p>Flujo nuevo con atención al cliente, pagos, soporte, ventas y contingencia, cada uno con su horario.</p>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="phone" id="m-phone">
+      <div class="top">
+        <div class="mark" aria-hidden="true">G</div>
+        <div><b>Gpon Internet</b><span>Cuenta de empresa</span></div>
+      </div>
+      <div class="chat" id="m-chat" aria-live="polite">
+        <div class="pill">Escribe cualquier mensaje para iniciar la conversación</div>
+      </div>
+      <div class="timer" id="m-timer" hidden>
+        <span id="m-timerTxt">Esperando que el cliente marque una opción…</span>
+        <button id="m-skip" type="button">No marca</button>
+      </div>
+      <div class="compose" id="m-form">
+        <input id="m-txt" autocomplete="off" placeholder="Escribe un mensaje" value="Hola, buenas tardes">
+        <button class="send" id="m-sendBtn" type="button" aria-label="Enviar">➤</button>
+      </div>
+      <div class="sheet" id="m-sheet" hidden>
+        <div class="card" role="dialog" aria-label="Elige una opción">
+          <h3>Elige una opción <button type="button" id="m-closeSheet" aria-label="Cerrar">×</button></h3>
+          <div id="m-opts"></div>
+          <button class="go" id="m-goOpt" type="button" disabled>Enviar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="box">
+        <h2>Condiciones de la prueba</h2>
+        <div class="ctrls">
+          <label class="f">Día
+            <select id="m-dia">
+              <option value="1">Lunes</option><option value="2">Martes</option><option value="3">Miércoles</option>
+              <option value="4">Jueves</option><option value="5">Viernes</option><option value="6">Sábado</option><option value="0">Domingo</option>
+            </select>
+          </label>
+          <label class="f">Hora del cliente
+            <input type="time" id="m-hora" value="10:30">
+          </label>
+          <label class="f">Cierre de ventas el sábado
+            <input type="time" id="m-cierreSab" value="13:00">
+          </label>
+          <label class="f">Tiempo de espera sin marcar
+            <select id="m-espera">
+              <option value="10">10 seg (demo rápida)</option>
+              <option value="30">30 seg</option>
+              <option value="120">2 min (real)</option>
+            </select>
+          </label>
+        </div>
+        <label class="chk"><input type="checkbox" id="m-real"> Usar el día y la hora actual de este equipo</label>
+        <div class="status">
+          <div class="chips"><span id="m-chipA" class="chip in">Atención: dentro</span><span id="m-chipV" class="chip in">Ventas: dentro</span></div>
+          <button class="reset" id="m-reset" type="button">Reiniciar chat</button>
+        </div>
+        <div class="cost"><div>Mensajes del bot en este chat<b id="m-nMsg">0</b></div><div>Costo aprox. (US$0.03 c/u)<b id="m-nCost">US$0.00</b></div></div>
+        <p class="note" style="margin-top:10px">La hora de cierre del sábado es provisional: cámbiala cuando la confirmes.</p>
+      </div>
+
+      <div class="box">
+        <h2>Recorrido en el flujo</h2>
+        <div class="flow">
+          <div class="node" data-n="inicio"><b>Cliente escribe</b></div>
+          <div class="node" data-n="menu"><b>Bienvenida + menú</b>Atención al cliente · Pagos y facturación · Soporte técnico · Quiero contratar Gpon</div>
+          <div class="node dec" data-n="marca"><b>¿Marca una opción en 2 min?</b></div>
+          <div class="lanes">
+            <div class="flow">
+              <div class="lane">Sí · Postventa</div>
+              <div class="node small" data-n="perfecto"><b>¡Perfecto!</b>Pide DNI/RUC y detalle</div>
+              <div class="node small" data-n="listo"><b>¡Listo, Gponlover!</b>Confirma datos</div>
+              <div class="node small dec" data-n="horA"><b>¿Horario atención?</b>Lun – Dom 7 am a 11 pm</div>
+              <div class="node small" data-n="colaA"><b>Dentro</b><span id="m-colaTxt">Cola del área marcada</span></div>
+              <div class="node small" data-n="gerA"><b>Fuera</b>Gerencial</div>
+            </div>
+            <div class="flow">
+              <div class="lane">Sí · Ventas</div>
+              <div class="node small" data-n="ventas"><b>Futuro Gponlover</b>Pide nombre, DNI y ubicación</div>
+              <div class="node small dec" data-n="horV"><b>¿Horario ventas?</b>L – V 7 am a 10 pm · Sáb <span class="sabTxt">7 am a 1 pm</span></div>
+              <div class="node small" data-n="colaV"><b>Dentro</b>Cola de ventas</div>
+              <div class="node small" data-n="fueraV"><b>Fuera</b>Mensaje fuera de horario → Cola de ventas</div>
+            </div>
+            <div class="flow">
+              <div class="lane">No · Contingencia</div>
+              <div class="node small" data-n="conting"><b>Contingencia</b>Gracias por comunicarte…</div>
+              <div class="node small dec" data-n="horC"><b>¿Horario atención?</b>Lun – Dom 7 am a 11 pm</div>
+              <div class="node small" data-n="colaC"><b>Dentro</b>Cola de ATC</div>
+              <div class="node small" data-n="gerC"><b>Fuera</b>Gerencial</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="note">Las franjas oscuras del chat son avisos internos del sistema; el cliente no los ve.</p>
+    </div>
+  </div>
+</div>
+
+<div class="wrap" id="p-root">
+  <header>
+    <div class="mark" aria-hidden="true">G</div>
+    <div>
+      <h1>Flujo postventa · ATC, Soporte y Pagos</h1>
+      <p>Bienvenida con menú, ¡Perfecto! con pedido de datos, mensaje de derivación por área, contingencia a los 2 min y Gerencial fuera de horario.</p>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="phone">
+      <div class="top">
+        <div class="mark" aria-hidden="true">G</div>
+        <div><b>Gpon Internet</b><span>Cuenta de empresa</span></div>
+      </div>
+      <div class="chat" id="p-chat" aria-live="polite">
+        <div class="pill">Escribe cualquier mensaje para iniciar la conversación</div>
+      </div>
+      <div class="timer" id="p-timer" hidden>
+        <span id="p-timerTxt"></span>
+        <button id="p-skip" type="button">No marca</button>
+      </div>
+      <div class="compose">
+        <input id="p-txt" autocomplete="off" placeholder="Escribe un mensaje" value="Hola, buenas tardes">
+        <button class="send" id="p-sendBtn" type="button" aria-label="Enviar">➤</button>
+      </div>
+      <div class="sheet" id="p-sheet" hidden>
+        <div class="card" role="dialog" aria-label="Elige una opción">
+          <h3>Elige una opción <button type="button" id="p-closeSheet" aria-label="Cerrar">×</button></h3>
+          <div id="p-opts"></div>
+          <button class="go" id="p-goOpt" type="button" disabled>Enviar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="box">
+        <h2>Condiciones de la prueba</h2>
+        <div class="ctrls">
+          <label class="f">Hora del cliente
+            <input type="time" id="p-hora" value="10:30">
+          </label>
+          <label class="f">Tiempo de espera sin marcar
+            <select id="p-espera">
+              <option value="10">10 seg (demo rápida)</option>
+              <option value="30">30 seg</option>
+              <option value="120">2 min (real)</option>
+            </select>
+          </label>
+        </div>
+        <label class="chk"><input type="checkbox" id="p-real"> Usar la hora actual de este equipo</label>
+        <div class="status">
+          <span id="p-chipA" class="chip in">Dentro de horario</span>
+          <button class="reset" id="p-reset" type="button">Reiniciar chat</button>
+        </div>
+        <div class="cost">
+          <div>Mensajes del bot en este chat<b id="p-nMsg">0</b></div>
+          <div>Costo aprox. (US$0.03 c/u)<b id="p-nCost">US$0.00</b></div>
+        </div>
+      </div>
+
+      <div class="box">
+        <h2>Recorrido en el flujo</h2>
+        <div class="flow">
+          <div class="node" data-n="inicio"><b>Cliente escribe</b></div>
+          <div class="node" data-n="menu"><b>Bienvenida + menú</b>Atención al cliente · Pagos y facturación · Soporte técnico</div>
+          <div class="node dec" data-n="marca"><b>¿Marca una opción en 2 min?</b></div>
+          <div class="node" data-n="perfecto"><b>¡Perfecto! (si marcó)</b>Pide DNI/RUC del titular y detalle de la consulta</div>
+          <div class="node dec" data-n="area"><b>¿Qué opción marcó?</b></div>
+          <div class="lanes">
+            <div class="flow">
+              <div class="lane">Pagos</div>
+              <div class="node small" data-n="m1"><b>¡Listo! 💳</b>Derivado a Pagos y facturación</div>
+            </div>
+            <div class="flow">
+              <div class="lane">Atención</div>
+              <div class="node small" data-n="m0"><b>¡Listo! 🧡</b>Derivado a Atención al cliente</div>
+            </div>
+            <div class="flow">
+              <div class="lane">Soporte</div>
+              <div class="node small" data-n="m2"><b>¡Listo! 🛠️</b>Derivado a Soporte técnico</div>
+            </div>
+            <div class="flow">
+              <div class="lane">No marcó</div>
+              <div class="node small" data-n="conting"><b>Contingencia</b>Gracias por comunicarte…</div>
+            </div>
+          </div>
+          <div class="node dec" data-n="horario"><b>¿Dentro de horario?</b>Lun – Dom 7:00 am a 11:00 pm</div>
+          <div class="split">
+            <div class="node" data-n="cola"><b>Dentro de horario</b><span id="p-colaTxt">Cola del área / Cola de ATC</span></div>
+            <div class="node" data-n="gerencial"><b>Fuera de horario</b>Gerencial · 11 pm a 7 am</div>
+          </div>
+        </div>
+      </div>
+      <p class="note">Las franjas oscuras del chat son avisos internos; el cliente no los ve.</p>
+    </div>
+  </div>
+</div>
+
+<div class="wrap" id="o-root">
+  <header>
+    <div class="mark" aria-hidden="true">G</div>
+    <div>
+      <h1>IVR GPON Chat · flujo original</h1>
+      <p>Simulación del flujo anterior tal como está en el diagrama IVR_CHATS: GponLover, Quiero tener Gpon y contingencia.</p>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="phone" id="o-phone">
+      <div class="top">
+        <div class="mark" aria-hidden="true">G</div>
+        <div><b>Gpon Internet</b><span>Cuenta de empresa</span></div>
+      </div>
+      <div class="chat" id="o-chat" aria-live="polite">
+        <div class="pill">Escribe cualquier mensaje para iniciar la conversación</div>
+      </div>
+      <div class="timer" id="o-timer" hidden>
+        <span id="o-timerTxt"></span>
+        <button id="o-skip" type="button">No marca</button>
+      </div>
+      <div class="compose">
+        <input id="o-txt" autocomplete="off" placeholder="Escribe un mensaje" value="Hola, buenas tardes">
+        <button class="send" id="o-sendBtn" type="button" aria-label="Enviar">➤</button>
+      </div>
+      <div class="sheet" id="o-sheet" hidden>
+        <div class="card" role="dialog" aria-label="Elige una opción">
+          <h3>Elige una opción <button type="button" id="o-closeSheet" aria-label="Cerrar">×</button></h3>
+          <div id="o-opts"></div>
+          <button class="go" id="o-goOpt" type="button" disabled>Enviar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="box">
+        <h2>Condiciones de la prueba</h2>
+        <div class="ctrls">
+          <label class="f">Día
+            <select id="o-dia">
+              <option value="1">Lunes</option><option value="2">Martes</option><option value="3">Miércoles</option>
+              <option value="4">Jueves</option><option value="5">Viernes</option><option value="6">Sábado</option><option value="0">Domingo</option>
+            </select>
+          </label>
+          <label class="f">Hora del cliente
+            <input type="time" id="o-hora" value="10:30">
+          </label>
+          <label class="f">Tiempo de espera sin marcar
+            <select id="o-espera">
+              <option value="10">10 seg (demo rápida)</option>
+              <option value="30">30 seg</option>
+              <option value="120">2 min (real)</option>
+            </select>
+          </label>
+        </div>
+        <label class="chk"><input type="checkbox" id="o-real"> Usar el día y la hora actual de este equipo</label>
+        <div class="status">
+          <div class="chips"><span id="o-chipA" class="chip in">GponLover: dentro</span><span id="o-chipV" class="chip in">Ventas: dentro</span></div>
+          <button class="reset" id="o-reset" type="button">Reiniciar chat</button>
+        </div>
+        <div class="cost">
+          <div>Mensajes del bot en este chat<b id="o-nMsg">0</b></div>
+          <div>Costo aprox. (US$0.03 c/u)<b id="o-nCost">US$0.00</b></div>
+        </div>
+      </div>
+
+      <div class="box">
+        <h2>Recorrido en el flujo</h2>
+        <div class="flow">
+          <div class="node" data-n="inicio"><b>Cliente escribe</b></div>
+          <div class="node" data-n="bienv"><b>Bienvenida</b>¡Hola! Bienvenido a la mejor experiencia del Poder de la Fibra</div>
+          <div class="node" data-n="sel1"><b>Por favor, selecciona una opción</b>“Soy GponLover” · “Quiero tener Gpon”</div>
+          <div class="node dec" data-n="marca1"><b>¿Marca una opción en 2 min?</b></div>
+          <div class="lanes">
+            <div class="flow">
+              <div class="lane">Soy GponLover</div>
+              <div class="node small" data-n="dni"><b>Ingresa tu documento</b>Si no ingresa en 10 seg, igual avanza</div>
+              <div class="node small" data-n="sel2"><b>Por favor, selecciona una opción</b></div>
+              <div class="node small" data-n="menuA"><b>Menú</b>Atención · Pagos · Soporte</div>
+              <div class="node small dec" data-n="marca2"><b>¿Marca en 2 min?</b></div>
+              <div class="node small dec" data-n="horA"><b>¿Horario?</b>Lun – Dom 7 am a 11 pm</div>
+              <div class="node small" data-n="unidad"><b>Dentro</b><span id="o-unidadTxt">Se deriva a la unidad</span></div>
+              <div class="node small" data-n="gerencia"><b>Fuera</b>Cola gerencia</div>
+            </div>
+            <div class="flow">
+              <div class="lane">No marcó</div>
+              <div class="node small" data-n="conting"><b>Contingencia</b>Se deriva a Atención al cliente</div>
+            </div>
+            <div class="flow">
+              <div class="lane">Quiero tener Gpon</div>
+              <div class="node small dec" data-n="horV"><b>¿Horario?</b>Lun – Sáb 8 am a 10 pm · Dom 9 am a 6 pm</div>
+              <div class="node small" data-n="fueraV"><b>Fuera</b>Cola fuera horario</div>
+              <div class="node small" data-n="ciudad"><b>¿Desde dónde te comunicas?</b>Lima · Cusco (5 seg)</div>
+              <div class="node small" data-n="seleccione"><b>Seleccione la opción</b></div>
+              <div class="node small" data-n="tipo"><b>Casa · Negocio</b></div>
+              <div class="node small dec" data-n="marca3"><b>¿Marca en 2 min?</b></div>
+              <div class="node small" data-n="callV"><b>Casa</b>Call ventas</div>
+              <div class="node small" data-n="b2b"><b>Negocio</b>Ventas B2B</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="note">Textos copiados del diagrama original. Las franjas oscuras del chat son avisos internos (derivaciones); el cliente no los ve.</p>
+    </div>
+  </div>
+</div>
+
+<div class="wrap" id="v-root">
+  <header>
+    <div class="mark" aria-hidden="true">G</div>
+    <div>
+      <h1>Flujo de ventas · Casa y Empresa</h1>
+      <p>Menú Casa / Empresa, pedido de datos, validación del horario de ventas y derivación a Cola de ventas o Cola B2B. Si no marca en 2 min, contingencia a la Cola de ATC.</p>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="phone">
+      <div class="top">
+        <div class="mark" aria-hidden="true">G</div>
+        <div><b>Gpon Internet</b><span>Cuenta de empresa</span></div>
+      </div>
+      <div class="chat" id="v-chat" aria-live="polite">
+        <div class="pill">Escribe cualquier mensaje para iniciar la conversación</div>
+      </div>
+      <div class="timer" id="v-timer" hidden>
+        <span id="v-timerTxt"></span>
+        <button id="v-skip" type="button">No marca</button>
+      </div>
+      <div class="compose">
+        <input id="v-txt" autocomplete="off" placeholder="Escribe un mensaje" value="Hola, quiero internet">
+        <button class="send" id="v-sendBtn" type="button" aria-label="Enviar">➤</button>
+      </div>
+      <div class="sheet" id="v-sheet" hidden>
+        <div class="card" role="dialog" aria-label="Elige una opción">
+          <h3>Elige una opción <button type="button" id="v-closeSheet" aria-label="Cerrar">×</button></h3>
+          <div id="v-opts"></div>
+          <button class="go" id="v-goOpt" type="button" disabled>Enviar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="box">
+        <h2>Condiciones de la prueba</h2>
+        <div class="ctrls">
+          <label class="f">Día
+            <select id="v-dia">
+              <option value="1">Lunes</option><option value="2">Martes</option><option value="3">Miércoles</option>
+              <option value="4">Jueves</option><option value="5">Viernes</option><option value="6">Sábado</option><option value="0">Domingo</option>
+            </select>
+          </label>
+          <label class="f">Hora del cliente
+            <input type="time" id="v-hora" value="10:30">
+          </label>
+          <label class="f">Cierre de ventas el sábado
+            <input type="time" id="v-cierreSab" value="13:00">
+          </label>
+          <label class="f">Tiempo de espera sin marcar
+            <select id="v-espera">
+              <option value="10">10 seg (demo rápida)</option>
+              <option value="30">30 seg</option>
+              <option value="120">2 min (real)</option>
+            </select>
+          </label>
+        </div>
+        <label class="chk"><input type="checkbox" id="v-real"> Usar el día y la hora actual de este equipo</label>
+        <div class="status">
+          <span id="v-chipV" class="chip in">Ventas: dentro de horario</span>
+          <button class="reset" id="v-reset" type="button">Reiniciar chat</button>
+        </div>
+        <div class="cost">
+          <div>Mensajes del bot en este chat<b id="v-nMsg">0</b></div>
+          <div>Costo aprox. (US$0.03 c/u)<b id="v-nCost">US$0.00</b></div>
+        </div>
+      </div>
+
+      <div class="box">
+        <h2>Recorrido en el flujo</h2>
+        <div class="flow">
+          <div class="node" data-n="inicio"><b>Prospecto escribe</b></div>
+          <div class="node" data-n="menu"><b>M1 · Bienvenida + menú</b>¿Para dónde deseas el Poder de la Fibra? · Casa · Empresa</div>
+          <div class="node dec" data-n="marca"><b>¿Marca una opción en 2 min?</b></div>
+          <div class="lanes">
+            <div class="flow">
+              <div class="lane">Casa</div>
+              <div class="node small" data-n="casa"><b>M2a · Casa 🏠</b>Pide nombre, DNI y ubicación</div>
+              <div class="node small" data-n="datosCasa"><b>Prospecto envía datos</b></div>
+              <div class="node small dec" data-n="horCasa"><b>¿Dentro de horario de ventas?</b></div>
+              <div class="node small" data-n="dentroCasa"><b>Dentro</b>¡Gracias! En breve…</div>
+              <div class="node small" data-n="fueraCasa"><b>Fuera</b>Mensaje fuera de horario</div>
+              <div class="node small" data-n="callV"><b>Cola de ventas</b>Hogar</div>
+            </div>
+            <div class="flow">
+              <div class="lane">Empresa</div>
+              <div class="node small" data-n="empresa"><b>M2b · Empresa 🏢</b>Pide RUC, representante legal y ubicación</div>
+              <div class="node small" data-n="datosEmp"><b>Prospecto envía datos</b></div>
+              <div class="node small dec" data-n="horEmp"><b>¿Dentro de horario de ventas?</b></div>
+              <div class="node small" data-n="dentroEmp"><b>Dentro</b>¡Gracias! En breve…</div>
+              <div class="node small" data-n="fueraEmp"><b>Fuera</b>Mensaje fuera de horario</div>
+              <div class="node small" data-n="b2b"><b>Cola B2B</b>Empresas</div>
+            </div>
+            <div class="flow">
+              <div class="lane">No marcó</div>
+              <div class="node small" data-n="conting"><b>M3 · ¡Perfecto!</b>En breve, un asesor te atenderá</div>
+              <div class="node small" data-n="atc"><b>Cola de ATC</b>Contingencia</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="note">Las franjas oscuras del chat son avisos internos; el cliente no los ve. Horario de ventas: lunes a viernes 7:00 am a 10:00 pm y sábado 7:00 am a la hora de cierre configurada; domingo sin atención. La contingencia no valida horario, igual que el diagrama.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+
+const MENSAJES = {
+  bienvenida: "¡Bienvenid@ 🧡, somos el Poder de la Fibra. Somos Gpon Internet! 🚀\n\n¿Cómo puedo ayudarte? ⚡\n\nSelecciona una opción del menú desplegable 👇",
+  opciones: ["Atención al cliente", "Pagos y facturación", "Soporte técnico", "Quiero contratar Gpon 🚀"],
+  perfecto: "¡Perfecto! En breve, un asesor especializado te atenderá 🚀\n\nPara agilizar tu consulta, por favor bríndanos lo siguiente:\n1️⃣ DNI/RUC del titular\n2️⃣ Detalle de tu consulta",
+  perfectoSoporte: "¡Perfecto! Mientras te asignamos un asesor técnico 🛠️, prueba esto:\n🔌 Apaga tu módem 1 min y vuelve a encenderlo\n💡 Revisa que el cable de fibra esté bien conectado\n🔴 Si ves la luz LOS en rojo, indícanoslo\n\nY envíanos:\n1️⃣ DNI/RUC del titular\n2️⃣ Detalle de tu consulta",
+  listo: "¡Listo, Gponlover! 🧡 Recibimos tu información correctamente ✅\n\n📋 Tu consulta ya está en nuestra cola de atención.\n👨‍💻 Un asesor revisará tu caso y te escribirá por este mismo chat.\n\n¡Gracias por confiar en el Poder de la Fibra! 🚀",
+  ventas: "¡Hola, futuro Gponlover! 😎🧡\nQueremos que vivas el verdadero Poder de la Fibra 🚀\n\nPara que un asesor te atienda, déjanos estos datos 👇\n1️⃣ Nombre completo y DNI\n2️⃣ Ubicación donde quieres el servicio 📍",
+  ventasDentro: "¡Gracias! ✅ Ya tenemos tus datos.\nEn breve, un asesor comercial te atenderá por este chat 🚀🧡",
+  ventasFuera: "🌙 En este momento estamos fuera de nuestro horario de atención:\n🕖 Lunes a viernes: 7:00 am a 10:00 pm\n🕖 Sábados: 7:00 am a {SAB}\n\nYa registramos tus datos ✅ Un asesor te escribirá por este chat apenas iniciemos ⏰🧡",
+  contingencia: "Gracias por comunicarte con GPON 🧡, en breve un asesor te estará atendiendo 💙",
+  horarioAtencion: { inicio: "07:00", fin: "23:00" },
+  horarioVentas: { inicio: "07:00", finSemana: "22:00" }
+};
+
+const P="m-", ROOT=document.getElementById("m-root");
+const $ = id => document.getElementById(P+id);
+const chat = $("chat");
+let nBot=0; function contar(){ nBot++; $("nMsg").textContent=nBot; $("nCost").textContent="US$"+(nBot*0.03).toFixed(2); }
+let estado = "inicio", tiempo = null, restante = 0, area = null, eleccion = null, menuBtn = null;
+
+function ahora(){
+  if ($("real").checked){ const d=new Date(); return {dia:d.getDay(), hora:String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")}; }
+  return {dia:Number($("dia").value), hora:$("hora").value || "10:30"};
+}
+function fmt12(hhmm){ const [h,m]=hhmm.split(":").map(Number); return ((h%12)||12)+":"+String(m).padStart(2,"0")+" "+(h>=12?"pm":"am"); }
+function horarioAtencion(){ const h=ahora().hora, r=MENSAJES.horarioAtencion; return h>=r.inicio && h<r.fin; }
+function horarioVentas(){
+  const {dia,hora}=ahora(), r=MENSAJES.horarioVentas;
+  if(dia===0) return false;
+  const fin = dia===6 ? ($("cierreSab").value||"13:00") : r.finSemana;
+  return hora>=r.inicio && hora<fin;
+}
+function etiquetaHora(){ return fmt12(ahora().hora).replace("am","a. m.").replace("pm","p. m."); }
+function pintarHorario(){
+  const a=horarioAtencion(), v=horarioVentas();
+  $("chipA").textContent="Atención: "+(a?"dentro":"fuera"); $("chipA").className="chip "+(a?"in":"out");
+  $("chipV").textContent="Ventas: "+(v?"dentro":"fuera"); $("chipV").className="chip "+(v?"in":"out");
+  ROOT.querySelectorAll(".sabTxt").forEach(s=>s.textContent="7 am a "+fmt12($("cierreSab").value||"13:00").replace(":00",""));
+}
+
+function marcar(n, actual=true){
+  ROOT.querySelectorAll(".node.now").forEach(x=>x.classList.remove("now"));
+  const el=ROOT.querySelector('.node[data-n="'+n+'"]'); if(!el) return;
+  el.classList.add("on"); if(actual) el.classList.add("now");
+}
+function bajar(){ chat.scrollTop=chat.scrollHeight; }
+function burbuja(texto, quien){
+  const d=document.createElement("div"); d.className="msg "+quien; d.textContent=texto;
+  const t=document.createElement("time"); t.textContent=etiquetaHora()+(quien==="user"?" ✓✓":"");
+  d.appendChild(t); chat.appendChild(d); bajar(); if(quien==="bot") contar(); return d;
+}
+function aviso(texto, warn){ const p=document.createElement("div"); p.className="pill"+(warn?" warn":""); p.textContent=texto; chat.appendChild(p); bajar(); }
+function espera(ms){ return new Promise(r=>setTimeout(r, matchMedia("(prefers-reduced-motion: reduce)").matches?100:ms)); }
+async function escribiendo(ms){
+  const t=document.createElement("div"); t.className="typing"; t.innerHTML="<i></i><i></i><i></i>"; chat.appendChild(t); bajar();
+  await espera(ms); t.remove();
+}
+function hint(texto, conBoton){ $("timer").hidden=false; $("timerTxt").textContent=texto; $("skip").hidden=!conBoton; }
+
+async function iniciar(){
+  estado="esperando";
+  await escribiendo(900);
+  const d=burbuja(MENSAJES.bienvenida,"bot");
+  menuBtn=document.createElement("button"); menuBtn.type="button"; menuBtn.className="listbtn"; menuBtn.textContent="☰ Elige una opción";
+  menuBtn.onclick=abrirMenu; d.insertBefore(menuBtn, d.querySelector("time"));
+  marcar("inicio",false); marcar("menu",false); marcar("marca");
+  arrancarTimer();
+}
+function arrancarTimer(){
+  restante=Number($("espera").value); actualizarTimer();
+  tiempo=setInterval(()=>{ restante--; actualizarTimer(); if(restante<=0) sinRespuesta(); },1000);
+}
+function actualizarTimer(){ const m=Math.floor(restante/60), s=restante%60; hint("Esperando opción · contingencia en "+m+":"+String(s).padStart(2,"0"), true); }
+function pararTimer(){ clearInterval(tiempo); tiempo=null; $("timer").hidden=true; }
+
+function abrirMenu(){
+  if(estado!=="esperando") return;
+  eleccion=null; $("goOpt").disabled=true;
+  $("opts").innerHTML=MENSAJES.opciones.map((o,i)=>'<label class="opt" for="'+P+'op'+i+'">'+o+'<input type="radio" name="'+P+'op" id="'+P+'op'+i+'" value="'+i+'"></label>').join("");
+  $("opts").querySelectorAll("input").forEach(r=>r.onchange=()=>{ eleccion=Number(r.value); $("goOpt").disabled=false; });
+  $("sheet").hidden=false;
+}
+$("closeSheet").onclick=()=>$("sheet").hidden=true;
+$("goOpt").onclick=async ()=>{
+  if(eleccion===null) return;
+  $("sheet").hidden=true; pararTimer(); if(menuBtn) menuBtn.disabled=true;
+  area=MENSAJES.opciones[eleccion];
+  burbuja(area,"user");
+  if(eleccion===3){
+    estado="ocupado"; marcar("ventas");
+    await escribiendo(900); burbuja(MENSAJES.ventas,"bot");
+    estado="datosVentas"; hint("Esperando los datos del prospecto…", false);
+  } else {
+    estado="ocupado"; marcar("perfecto");
+    await escribiendo(900); burbuja(MENSAJES.perfecto,"bot");
+    estado="datosCliente"; hint("Esperando DNI/RUC y detalle de la consulta…", false);
+  }
+};
+
+async function sinRespuesta(){
+  if(estado!=="esperando") return;
+  pararTimer(); estado="ocupado"; $("sheet").hidden=true; if(menuBtn) menuBtn.disabled=true;
+  aviso("Sin respuesta en 2 min → Contingencia", true);
+  marcar("conting");
+  await escribiendo(800); burbuja(MENSAJES.contingencia,"bot");
+  marcar("horC"); await espera(500);
+  if(horarioAtencion()){ marcar("colaC"); aviso("Dentro de horario → derivado a: Cola de ATC"); }
+  else { marcar("gerC"); aviso("Fuera de horario → derivado a: Cola Gerencial"); }
+  estado="en_cola";
+}
+$("skip").onclick=sinRespuesta;
+
+async function datosCliente(){
+  estado="ocupado"; $("timer").hidden=true;
+  marcar("listo"); await escribiendo(900); burbuja(MENSAJES.listo,"bot");
+  marcar("horA"); await espera(500);
+  if(horarioAtencion()){ $("colaTxt").textContent="Cola de "+area; marcar("colaA"); aviso("Dentro de horario → derivado a: Cola de "+area); }
+  else { marcar("gerA"); aviso("Fuera de horario → derivado a: Cola Gerencial"); }
+  estado="en_cola";
+}
+async function datosVentas(){
+  estado="ocupado"; $("timer").hidden=true;
+  marcar("horV"); await espera(600);
+  if(horarioVentas()){ marcar("colaV"); await escribiendo(900); burbuja(MENSAJES.ventasDentro,"bot"); aviso("Dentro de horario de ventas → derivado a: Cola de ventas"); }
+  else {
+    marcar("fueraV");
+    await escribiendo(900);
+    burbuja(MENSAJES.ventasFuera.replace("{SAB}", fmt12($("cierreSab").value||"13:00")),"bot");
+    aviso("Fuera de horario de ventas → queda en Cola de ventas para la apertura");
+  }
+  estado="en_cola";
+}
+
+function enviar(){
+  const v=$("txt").value.trim(); if(!v) return;
+  $("txt").value="";
+  if(estado==="inicio"){ chat.innerHTML=""; burbuja(v,"user"); iniciar(); return; }
+  burbuja(v,"user");
+  if(estado==="datosCliente") datosCliente();
+  else if(estado==="datosVentas") datosVentas();
+}
+$("sendBtn").addEventListener("click", enviar);
+$("txt").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); enviar(); } });
+
+function reiniciar(){
+  pararTimer(); nBot=0; $("nMsg").textContent="0"; $("nCost").textContent="US$0.00"; estado="inicio"; area=null; menuBtn=null; $("sheet").hidden=true;
+  chat.innerHTML='<div class="pill">Escribe cualquier mensaje para iniciar la conversación</div>';
+  ROOT.querySelectorAll(".node").forEach(n=>n.classList.remove("on","now"));
+  $("colaTxt").textContent="Cola del área marcada";
+  $("txt").value="Hola, buenas tardes"; pintarHorario();
+}
+$("reset").onclick=reiniciar;
+["hora","dia","cierreSab"].forEach(id=>$(id).addEventListener("input",pintarHorario));
+$("dia").addEventListener("change",pintarHorario);
+$("real").onchange=()=>{ $("hora").disabled=$("dia").disabled=$("real").checked; pintarHorario(); };
+pintarHorario();
+
+})();
+(function(){
+
+const MENSAJES = {
+  bienvenida: "¡Bienvenid@ 🧡, somos el Poder de la Fibra. Somos Gpon Internet! 🚀\n\n¿Cómo puedo ayudarte? ⚡\n\nSelecciona una opción del menú desplegable 👇",
+  opciones: ["Atención al cliente", "Pagos y facturación", "Soporte técnico"],
+  perfecto: "¡Perfecto! En breve, un asesor especializado te atenderá 🚀\n\nPara agilizar tu consulta, por favor bríndanos lo siguiente:\n1️⃣ DNI/RUC del titular\n2️⃣ Detalle de tu consulta",
+  colas: ["Cola de Atención al cliente", "Cola de Pagos y facturación", "Cola de Soporte técnico"],
+  derivado: [
+    "¡Listo, Gponlover! 🧡 Tu caso fue derivado a nuestro equipo de Atención al cliente 🙋‍♀️\nUn asesor revisará tu consulta y te escribirá por este chat en breve 💬",
+    "¡Listo, Gponlover! 💳 Tu caso fue derivado a nuestro equipo de Pagos y facturación.\nUn asesor revisará tu cuenta y te escribirá por este chat en breve 🧾",
+    "¡Listo, Gponlover! 🛠️ Tu caso fue derivado a nuestro equipo de Soporte técnico.\nUn especialista revisará tu servicio y te escribirá por este chat en breve ⚡"
+  ],
+  contingencia: "Gracias por comunicarte con GPON 🧡, en breve un asesor te estará atendiendo 💙",
+  horario: { inicio: "07:00", fin: "23:00" }
+};
+const COSTO = 0.03;
+
+const P="p-", ROOT=document.getElementById("p-root");
+const $ = id => document.getElementById(P+id);
+const chat = $("chat");
+let areaSel=0, estado="inicio", tiempo=null, nBot=0, eleccion=null, menuBtn=null, flujo=0;
+
+function horaActual(){
+  if($("real").checked){ const d=new Date(); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
+  return $("hora").value||"10:30";
+}
+function dentro(){ const h=horaActual(); return h>=MENSAJES.horario.inicio && h<MENSAJES.horario.fin; }
+function etiquetaHora(){ const [h,m]=horaActual().split(":").map(Number); return ((h%12)||12)+":"+String(m).padStart(2,"0")+(h>=12?" p. m.":" a. m."); }
+function pintarHorario(){ const ok=dentro(); $("chipA").textContent=(ok?"Dentro":"Fuera")+" de horario ("+horaActual()+")"; $("chipA").className="chip "+(ok?"in":"out"); }
+function contar(){ nBot++; $("nMsg").textContent=nBot; $("nCost").textContent="US$"+(nBot*COSTO).toFixed(2); }
+
+function marcar(n, actual=true){
+  ROOT.querySelectorAll(".node.now").forEach(x=>x.classList.remove("now"));
+  const el=ROOT.querySelector('.node[data-n="'+n+'"]'); if(!el) return;
+  el.classList.add("on"); if(actual) el.classList.add("now");
+}
+function bajar(){ chat.scrollTop=chat.scrollHeight; }
+function burbuja(texto, quien){
+  const d=document.createElement("div"); d.className="msg "+quien; d.textContent=texto;
+  const t=document.createElement("time"); t.textContent=etiquetaHora()+(quien==="user"?" ✓✓":"");
+  d.appendChild(t); chat.appendChild(d); bajar(); if(quien==="bot") contar(); return d;
+}
+function aviso(texto, warn){ const p=document.createElement("div"); p.className="pill"+(warn?" warn":""); p.textContent=texto; chat.appendChild(p); bajar(); }
+function espera(ms){ return new Promise(r=>setTimeout(r, matchMedia("(prefers-reduced-motion: reduce)").matches?100:ms)); }
+async function bot(texto){
+  const id=flujo;
+  const t=document.createElement("div"); t.className="typing"; t.innerHTML="<i></i><i></i><i></i>"; chat.appendChild(t); bajar();
+  await espera(800); t.remove();
+  if(id!==flujo) throw new Error("reinicio");
+  return burbuja(texto,"bot");
+}
+
+function arrancarTimer(){
+  let r=Number($("espera").value);
+  const pinta=()=>{ const m=Math.floor(r/60), s=r%60; $("timerTxt").textContent="Esperando opción · contingencia en "+m+":"+String(s).padStart(2,"0"); };
+  $("timer").hidden=false; pinta();
+  tiempo=setInterval(()=>{ r--; pinta(); if(r<=0) sinRespuesta(); },1000);
+}
+function pararTimer(){ clearInterval(tiempo); tiempo=null; $("timer").hidden=true; }
+
+async function iniciar(){
+  try{
+    const d=await bot(MENSAJES.bienvenida);
+    menuBtn=document.createElement("button"); menuBtn.type="button"; menuBtn.className="listbtn"; menuBtn.textContent="☰ Elige una opción";
+    menuBtn.onclick=abrirMenu; d.insertBefore(menuBtn, d.querySelector("time"));
+    marcar("inicio",false); marcar("menu",false); marcar("marca");
+    estado="esperando"; arrancarTimer();
+  }catch(e){}
+}
+function abrirMenu(){
+  if(estado!=="esperando") return;
+  eleccion=null; $("goOpt").disabled=true;
+  $("opts").innerHTML=MENSAJES.opciones.map((o,i)=>'<label class="opt" for="'+P+'op'+i+'">'+o+'<input type="radio" name="'+P+'op" id="'+P+'op'+i+'" value="'+i+'"></label>').join("");
+  $("opts").querySelectorAll("input").forEach(r=>r.onchange=()=>{ eleccion=Number(r.value); $("goOpt").disabled=false; });
+  $("sheet").hidden=false;
+}
+$("closeSheet").onclick=()=>$("sheet").hidden=true;
+$("goOpt").onclick=async ()=>{
+  if(eleccion===null||estado!=="esperando") return;
+  const i=eleccion; estado="ocupado"; $("sheet").hidden=true; pararTimer(); if(menuBtn) menuBtn.disabled=true;
+  burbuja(MENSAJES.opciones[i],"user");
+  try{
+    marcar("perfecto");
+    await bot(MENSAJES.perfecto);
+    areaSel=i; estado="datos";
+    $("timer").hidden=false; $("skip").hidden=true; $("timerTxt").textContent="Esperando DNI/RUC y detalle de la consulta…";
+  }catch(e){}
+};
+async function recibirDatos(){
+  estado="ocupado"; $("timer").hidden=true; $("skip").hidden=false;
+  const i=areaSel;
+  try{
+    marcar("area",false); marcar("m"+i);
+    await bot(MENSAJES.derivado[i]);
+    await derivar(MENSAJES.colas[i]);
+  }catch(e){}
+}
+async function sinRespuesta(){
+  if(estado!=="esperando") return;
+  estado="ocupado"; pararTimer(); $("sheet").hidden=true; if(menuBtn) menuBtn.disabled=true;
+  aviso("No marcó en 2 min → Contingencia", true);
+  try{
+    marcar("conting");
+    await bot(MENSAJES.contingencia);
+    await derivar("Cola de ATC");
+  }catch(e){}
+}
+$("skip").onclick=sinRespuesta;
+async function derivar(cola){
+  marcar("horario"); await espera(500);
+  if(dentro()){ $("colaTxt").textContent=cola; marcar("cola"); aviso("Dentro de horario → derivado a: "+cola); }
+  else { marcar("gerencial"); aviso("Fuera de horario → derivado a: Gerencial"); }
+  estado="en_cola";
+}
+
+function enviar(){
+  const v=$("txt").value.trim(); if(!v) return;
+  $("txt").value="";
+  if(estado==="inicio"){ chat.innerHTML=""; burbuja(v,"user"); estado="ocupado"; iniciar(); return; }
+  burbuja(v,"user");
+  if(estado==="datos") recibirDatos();
+}
+$("sendBtn").addEventListener("click", enviar);
+$("txt").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); enviar(); } });
+
+function reiniciar(){
+  flujo++; pararTimer(); $("skip").hidden=false; estado="inicio"; menuBtn=null; nBot=0; $("nMsg").textContent="0"; $("nCost").textContent="US$0.00";
+  $("sheet").hidden=true;
+  chat.innerHTML='<div class="pill">Escribe cualquier mensaje para iniciar la conversación</div>';
+  ROOT.querySelectorAll(".node").forEach(n=>n.classList.remove("on","now"));
+  $("colaTxt").textContent="Cola del área / Cola de ATC";
+  $("txt").value="Hola, buenas tardes"; pintarHorario();
+}
+$("reset").onclick=reiniciar;
+$("hora").addEventListener("input",pintarHorario);
+$("real").onchange=()=>{ $("hora").disabled=$("real").checked; pintarHorario(); };
+pintarHorario();
+
+})();
+(function(){
+
+const MENSAJES = {
+  bienvenida: "¡Hola, ! 👋 Bienvenido a la mejor experiencia del Poder de la Fibra. ⚡ Somos el equipo de Gpon Internet. 🧡",
+  selecciona: "Por favor, selecciona una opción para poder ayudarte 👇",
+  opciones1: ["Soy GponLover", "Quiero tener Gpon"],
+  documento: "Ingresa tu documento de identidad 🪪",
+  menuA: "Atención al cliente. Selecciona la opción del menú desplegable.\nPagos y facturación. Selecciona la opción del menú desplegable.\nSoporte Tecnico. Selecciona la opción del menú desplegable.",
+  opcionesA: ["Atención al cliente", "Pagos y facturación", "Soporte técnico"],
+  unidades: ["Atención al cliente o soporte técnico y Reclamos", "Pagos y facturación", "Atención al cliente o soporte técnico y Reclamos"],
+  enBreve: "En breve, un asesor Gpon te estará atendiendo 🧡",
+  contingencia: "Gracias por comunicarte a GPON. 🧡\nEn breve, un asesor Gpon te estará atendiendo",
+  fueraVentas: "Futuro Gponlover, queremos que empieces a vivir el verdadero poder de la fibra. 😎\nNuestros asesores estarán disponibles en breve y se comunicarán contigo.\nRecuerda nuestro horario de atención:\nLun - Sab 8:00 am a 10:00 pm / Dom 9:00 am a 6:00 pm\nEstamos encantados de atenderte. 🧡",
+  ciudad: "Coméntanos: ¿desde dónde te comunicas? 📍",
+  opcionesCiudad: ["Lima", "Cusco"],
+  seleccione: "Seleccione la opción del menú desplegable.",
+  tipo: "“Quiero Internet para mi casa” / “Quiero Internet para mi negocio”. Selecciona la opción del menú desplegable.",
+  opcionesTipo: ["Quiero Internet para mi casa", "Quiero Internet para mi negocio"]
+};
+const COSTO = 0.03;
+
+const P="o-", ROOT=document.getElementById("o-root");
+const $ = id => document.getElementById(P+id);
+const chat = $("chat");
+let estado = "inicio", tiempo = null, nBot = 0, lista = null, eleccion = null, flujo = 0;
+
+function ahora(){
+  if ($("real").checked){ const d=new Date(); return {dia:d.getDay(), hora:String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")}; }
+  return {dia:Number($("dia").value), hora:$("hora").value||"10:30"};
+}
+function horarioClientes(){ const h=ahora().hora; return h>="07:00" && h<"23:00"; }
+function horarioVentas(){ const {dia,hora}=ahora(); return dia===0 ? (hora>="09:00"&&hora<"18:00") : (hora>="08:00"&&hora<"22:00"); }
+function etiquetaHora(){ const [h,m]=ahora().hora.split(":").map(Number); return ((h%12)||12)+":"+String(m).padStart(2,"0")+(h>=12?" p. m.":" a. m."); }
+function pintarHorario(){
+  const a=horarioClientes(), v=horarioVentas();
+  $("chipA").textContent="GponLover: "+(a?"dentro":"fuera"); $("chipA").className="chip "+(a?"in":"out");
+  $("chipV").textContent="Ventas: "+(v?"dentro":"fuera"); $("chipV").className="chip "+(v?"in":"out");
+}
+function contar(){ nBot++; $("nMsg").textContent=nBot; $("nCost").textContent="US$"+(nBot*COSTO).toFixed(2); }
+
+function marcar(n, actual=true){
+  ROOT.querySelectorAll(".node.now").forEach(x=>x.classList.remove("now"));
+  const el=ROOT.querySelector('.node[data-n="'+n+'"]'); if(!el) return;
+  el.classList.add("on"); if(actual) el.classList.add("now");
+}
+function bajar(){ chat.scrollTop=chat.scrollHeight; }
+function burbuja(texto, quien){
+  const d=document.createElement("div"); d.className="msg "+quien; d.textContent=texto;
+  const t=document.createElement("time"); t.textContent=etiquetaHora()+(quien==="user"?" ✓✓":"");
+  d.appendChild(t); chat.appendChild(d); bajar(); if(quien==="bot") contar(); return d;
+}
+function aviso(texto, warn){ const p=document.createElement("div"); p.className="pill"+(warn?" warn":""); p.textContent=texto; chat.appendChild(p); bajar(); }
+function espera(ms){ return new Promise(r=>setTimeout(r, matchMedia("(prefers-reduced-motion: reduce)").matches?100:ms)); }
+async function bot(texto, ms=700){
+  const id=flujo;
+  const t=document.createElement("div"); t.className="typing"; t.innerHTML="<i></i><i></i><i></i>"; chat.appendChild(t); bajar();
+  await espera(ms); t.remove();
+  if(id!==flujo) throw new Error("reinicio");
+  return burbuja(texto,"bot");
+}
+
+function cuentaAtras(seg, texto, conBoton, alVencer){
+  pararTimer();
+  let r=seg; const pinta=()=>{ const m=Math.floor(r/60), s=r%60; $("timerTxt").textContent=texto+" "+m+":"+String(s).padStart(2,"0"); };
+  $("timer").hidden=false; $("skip").hidden=!conBoton; pinta();
+  tiempo=setInterval(()=>{ r--; pinta(); if(r<=0){ pararTimer(); alVencer(); } },1000);
+}
+function pararTimer(){ clearInterval(tiempo); tiempo=null; $("timer").hidden=true; }
+
+/* Mensaje con lista desplegable */
+async function botLista(texto, opciones, seg, textoTimer, alElegir, alVencer){
+  const d=await bot(texto);
+  const btn=document.createElement("button"); btn.type="button"; btn.className="listbtn"; btn.textContent="☰ Elige una opción";
+  d.insertBefore(btn, d.querySelector("time"));
+  lista={btn, opciones, alElegir, alVencer};
+  btn.onclick=abrirMenu;
+  cuentaAtras(seg, textoTimer, true, ()=>{ if(lista){ const l=lista; cerrarLista(); l.alVencer(); } });
+}
+function cerrarLista(){ if(lista){ lista.btn.disabled=true; lista=null; } $("sheet").hidden=true; pararTimer(); }
+function abrirMenu(){
+  if(!lista) return;
+  eleccion=null; $("goOpt").disabled=true;
+  $("opts").innerHTML=lista.opciones.map((o,i)=>'<label class="opt" for="'+P+'op'+i+'">'+o+'<input type="radio" name="'+P+'op" id="'+P+'op'+i+'" value="'+i+'"></label>').join("");
+  $("opts").querySelectorAll("input").forEach(r=>r.onchange=()=>{ eleccion=Number(r.value); $("goOpt").disabled=false; });
+  $("sheet").hidden=false;
+}
+$("closeSheet").onclick=()=>$("sheet").hidden=true;
+$("goOpt").onclick=()=>{
+  if(eleccion===null||!lista) return;
+  const l=lista, i=eleccion; cerrarLista();
+  burbuja(l.opciones[i],"user");
+  l.alElegir(i);
+};
+$("skip").onclick=()=>{ if(lista){ const l=lista; cerrarLista(); l.alVencer(); } else if(estado==="dni"){ pararTimer(); dniVencido(); } };
+
+const seguro = fn => (...a) => fn(...a).catch(()=>{});
+
+/* Flujo */
+const iniciar = seguro(async ()=>{
+  marcar("inicio",false);
+  await bot(MENSAJES.bienvenida); marcar("bienv",false);
+  marcar("sel1",false); marcar("marca1");
+  await botLista(MENSAJES.selecciona, MENSAJES.opciones1, Number($("espera").value), "Esperando opción · contingencia en",
+    i=> i===0 ? gponlover() : quieroGpon(), contingencia);
+});
+
+const contingencia = seguro(async ()=>{
+  aviso("No marcó en 2 min → Contingencia", true);
+  marcar("conting");
+  aviso("Se deriva a la unidad Atención al cliente");
+  await bot(MENSAJES.contingencia);
+  estado="fin";
+});
+
+const gponlover = seguro(async ()=>{
+  marcar("dni");
+  await bot(MENSAJES.documento);
+  estado="dni";
+  cuentaAtras(10, "Esperando documento · sigue igual en", false, dniVencido);
+});
+function dniVencido(){ if(estado!=="dni") return; estado="ocupado"; aviso("No ingresó documento en 10 seg → igual ingresa a las opciones", true); menuClientes(); }
+const menuClientes = seguro(async ()=>{
+  marcar("sel2");
+  await bot(MENSAJES.selecciona);
+  marcar("menuA",false); marcar("marca2");
+  await botLista(MENSAJES.menuA, MENSAJES.opcionesA, Number($("espera").value), "Esperando opción · contingencia en", derivarCliente, contingencia);
+});
+const derivarCliente = seguro(async i=>{
+  marcar("horA"); await espera(500);
+  if(horarioClientes()){
+    $("unidadTxt").textContent="Unidad "+MENSAJES.unidades[i]; marcar("unidad");
+    aviso("Se deriva a la unidad "+MENSAJES.unidades[i]);
+    await bot(MENSAJES.enBreve);
+  } else {
+    marcar("gerencia"); aviso("Fuera de horario → Cola gerencia");
+    await bot(MENSAJES.enBreve);
+  }
+  estado="fin";
+});
+
+const quieroGpon = seguro(async ()=>{
+  marcar("horV"); await espera(500);
+  if(!horarioVentas()){
+    marcar("fueraV"); aviso("Fuera de horario de ventas → Cola fuera horario");
+    await bot(MENSAJES.fueraVentas);
+    estado="fin"; return;
+  }
+  marcar("ciudad");
+  await botLista(MENSAJES.ciudad, MENSAJES.opcionesCiudad, 5, "Esperando ciudad · sigue igual en",
+    ()=>tipoServicio(), ()=>{ aviso("No marcó en 5 seg → igual ingresa al menú de opciones", true); tipoServicio(); });
+});
+const tipoServicio = seguro(async ()=>{
+  marcar("seleccione");
+  await bot(MENSAJES.seleccione);
+  marcar("tipo",false); marcar("marca3");
+  await botLista(MENSAJES.tipo, MENSAJES.opcionesTipo, Number($("espera").value), "Esperando opción · contingencia en",
+    derivarVentas, contingencia);
+});
+const derivarVentas = seguro(async i=>{
+  if(i===0){ marcar("callV"); aviso("Se deriva a call ventas"); }
+  else { marcar("b2b"); aviso("Se deriva a ventas B2B"); }
+  await bot(MENSAJES.enBreve);
+  estado="fin";
+});
+
+function enviar(){
+  const v=$("txt").value.trim(); if(!v) return;
+  $("txt").value="";
+  if(estado==="inicio"){ chat.innerHTML=""; burbuja(v,"user"); estado="ocupado"; iniciar(); return; }
+  burbuja(v,"user");
+  if(estado==="dni"){ pararTimer(); estado="ocupado"; menuClientes(); }
+}
+$("sendBtn").addEventListener("click", enviar);
+$("txt").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); enviar(); } });
+
+function reiniciar(){
+  flujo++; pararTimer(); lista=null; estado="inicio"; nBot=0; $("nMsg").textContent="0"; $("nCost").textContent="US$0.00";
+  $("sheet").hidden=true;
+  chat.innerHTML='<div class="pill">Escribe cualquier mensaje para iniciar la conversación</div>';
+  ROOT.querySelectorAll(".node").forEach(n=>n.classList.remove("on","now"));
+  $("unidadTxt").textContent="Se deriva a la unidad";
+  $("txt").value="Hola, buenas tardes"; pintarHorario();
+}
+$("reset").onclick=reiniciar;
+["hora","dia"].forEach(id=>{ $(id).addEventListener("input",pintarHorario); $(id).addEventListener("change",pintarHorario); });
+$("real").onchange=()=>{ $("hora").disabled=$("dia").disabled=$("real").checked; pintarHorario(); };
+pintarHorario();
+
+})();
+(function(){
+
+const MENSAJES = {
+  bienvenida: "¡Bienvenid@ 🧡, somos el Poder de la Fibra. Somos Gpon Internet! 🚀\n\n¿Para dónde deseas el Poder de la Fibra? ⚡\n\nSelecciona una opción del menú desplegable 👇",
+  opciones: ["Casa 🏠", "Empresa 🏢"],
+  casa: "¡Hola, futuro Gponlover! 😎🧡 Queremos que vivas el verdadero Poder de la Fibra 🚀\n\nBríndanos los siguientes datos 🏠👇\n1️⃣ Nombre completo y DNI\n2️⃣ Ubicación donde quieras el servicio 📍",
+  empresa: "¡Hola, futuro Gponlover! 😎🧡 Queremos que vivas el verdadero Poder de la Fibra 🚀\n\nBríndanos los siguientes datos 🏢👇\n1️⃣ Nombre del representante legal y RUC de la empresa\n2️⃣ Ubicación de tu empresa donde quieras el servicio 📍",
+  gracias: "¡Gracias! ✅ Ya tenemos tus datos. En breve, un asesor comercial te atenderá por este chat 🚀🧡",
+  fuera: "¡Gracias! ✅ Ya tenemos tus datos 🧡\n🌙 En este momento estamos fuera de nuestro horario de atención:\n🕖 Lunes a viernes: 7:00 am a 10:00 pm\n🕖 Sábados: 7:00 am a {SAB}\nUn asesor comercial te escribirá por este chat apenas iniciemos ⏰",
+  contingencia: "¡Perfecto! En breve, un asesor especializado te atenderá 🚀"
+};
+const COSTO = 0.03;
+
+const P="v-", ROOT=document.getElementById("v-root");
+const $ = id => document.getElementById(P+id);
+const chat = $("chat");
+let estado="inicio", tiempo=null, nBot=0, eleccion=null, menuBtn=null, flujo=0, opcion=0;
+
+function ahora(){
+  if($("real").checked){ const d=new Date(); return {dia:d.getDay(), hora:String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")}; }
+  return {dia:Number($("dia").value), hora:$("hora").value||"10:30"};
+}
+function fmt12(hhmm){ const [h,m]=hhmm.split(":").map(Number); return ((h%12)||12)+":"+String(m).padStart(2,"0")+" "+(h>=12?"pm":"am"); }
+function cierreSab(){ return $("cierreSab").value||"13:00"; }
+function horarioVentas(){ const {dia,hora}=ahora(); if(dia===0) return false; const fin=dia===6?cierreSab():"22:00"; return hora>="07:00" && hora<fin; }
+function etiquetaHora(){ return fmt12(ahora().hora).replace("am","a. m.").replace("pm","p. m."); }
+function pintarHorario(){ const ok=horarioVentas(); $("chipV").textContent="Ventas: "+(ok?"dentro":"fuera")+" de horario"; $("chipV").className="chip "+(ok?"in":"out"); }
+function contar(){ nBot++; $("nMsg").textContent=nBot; $("nCost").textContent="US$"+(nBot*COSTO).toFixed(2); }
+function marcar(n, actual=true){
+  ROOT.querySelectorAll(".node.now").forEach(x=>x.classList.remove("now"));
+  const el=ROOT.querySelector('.node[data-n="'+n+'"]'); if(!el) return;
+  el.classList.add("on"); if(actual) el.classList.add("now");
+}
+function bajar(){ chat.scrollTop=chat.scrollHeight; }
+function burbuja(texto, quien){
+  const d=document.createElement("div"); d.className="msg "+quien; d.textContent=texto;
+  const t=document.createElement("time"); t.textContent=etiquetaHora()+(quien==="user"?" ✓✓":"");
+  d.appendChild(t); chat.appendChild(d); bajar(); if(quien==="bot") contar(); return d;
+}
+function aviso(texto, warn){ const p=document.createElement("div"); p.className="pill"+(warn?" warn":""); p.textContent=texto; chat.appendChild(p); bajar(); }
+function espera(ms){ return new Promise(r=>setTimeout(r, matchMedia("(prefers-reduced-motion: reduce)").matches?100:ms)); }
+async function bot(texto){
+  const id=flujo;
+  const t=document.createElement("div"); t.className="typing"; t.innerHTML="<i></i><i></i><i></i>"; chat.appendChild(t); bajar();
+  await espera(800); t.remove();
+  if(id!==flujo) throw new Error("reinicio");
+  return burbuja(texto,"bot");
+}
+function arrancarTimer(){
+  let r=Number($("espera").value);
+  const pinta=()=>{ const m=Math.floor(r/60), s=r%60; $("timerTxt").textContent="Esperando opción · contingencia en "+m+":"+String(s).padStart(2,"0"); };
+  $("timer").hidden=false; $("skip").hidden=false; pinta();
+  tiempo=setInterval(()=>{ r--; pinta(); if(r<=0) sinRespuesta(); },1000);
+}
+function pararTimer(){ clearInterval(tiempo); tiempo=null; $("timer").hidden=true; }
+
+async function iniciar(){
+  try{
+    const d=await bot(MENSAJES.bienvenida);
+    menuBtn=document.createElement("button"); menuBtn.type="button"; menuBtn.className="listbtn"; menuBtn.textContent="☰ Elige una opción";
+    menuBtn.onclick=abrirMenu; d.insertBefore(menuBtn, d.querySelector("time"));
+    marcar("inicio",false); marcar("menu",false); marcar("marca");
+    estado="esperando"; arrancarTimer();
+  }catch(e){}
+}
+function abrirMenu(){
+  if(estado!=="esperando") return;
+  eleccion=null; $("goOpt").disabled=true;
+  $("opts").innerHTML=MENSAJES.opciones.map((o,i)=>'<label class="opt" for="'+P+'op'+i+'">'+o+'<input type="radio" name="'+P+'op" id="'+P+'op'+i+'" value="'+i+'"></label>').join("");
+  $("opts").querySelectorAll("input").forEach(r=>r.onchange=()=>{ eleccion=Number(r.value); $("goOpt").disabled=false; });
+  $("sheet").hidden=false;
+}
+$("closeSheet").onclick=()=>$("sheet").hidden=true;
+$("goOpt").onclick=async ()=>{
+  if(eleccion===null||estado!=="esperando") return;
+  opcion=eleccion; estado="ocupado"; $("sheet").hidden=true; pararTimer(); if(menuBtn) menuBtn.disabled=true;
+  burbuja(MENSAJES.opciones[opcion],"user");
+  try{
+    marcar(opcion===0?"casa":"empresa");
+    await bot(opcion===0?MENSAJES.casa:MENSAJES.empresa);
+    estado="datos";
+    $("timer").hidden=false; $("skip").hidden=true; $("timerTxt").textContent="Esperando los datos del prospecto…";
+  }catch(e){}
+};
+async function sinRespuesta(){
+  if(estado!=="esperando") return;
+  estado="ocupado"; pararTimer(); $("sheet").hidden=true; if(menuBtn) menuBtn.disabled=true;
+  aviso("No marcó en 2 min → Contingencia", true);
+  try{
+    marcar("conting");
+    await bot(MENSAJES.contingencia);
+    marcar("atc"); aviso("Derivado a: Cola de ATC");
+    estado="en_cola";
+  }catch(e){}
+}
+$("skip").onclick=sinRespuesta;
+async function recibirDatos(){
+  estado="ocupado"; $("timer").hidden=true;
+  const casa=opcion===0;
+  try{
+    marcar(casa?"datosCasa":"datosEmp",false); marcar(casa?"horCasa":"horEmp"); await espera(500);
+    if(horarioVentas()){ marcar(casa?"dentroCasa":"dentroEmp"); await bot(MENSAJES.gracias); }
+    else { marcar(casa?"fueraCasa":"fueraEmp"); await bot(MENSAJES.fuera.replace("{SAB}", fmt12(cierreSab()))); }
+    if(casa){ marcar("callV"); aviso((horarioVentas()?"Dentro":"Fuera")+" de horario → derivado a: Cola de ventas"); }
+    else { marcar("b2b"); aviso((horarioVentas()?"Dentro":"Fuera")+" de horario → derivado a: Cola B2B"); }
+    estado="en_cola";
+  }catch(e){}
+}
+
+function enviar(){
+  const v=$("txt").value.trim(); if(!v) return;
+  $("txt").value="";
+  if(estado==="inicio"){ chat.innerHTML=""; burbuja(v,"user"); estado="ocupado"; iniciar(); return; }
+  burbuja(v,"user");
+  if(estado==="datos") recibirDatos();
+}
+$("sendBtn").addEventListener("click", enviar);
+$("txt").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); enviar(); } });
+
+function reiniciar(){
+  flujo++; pararTimer(); estado="inicio"; menuBtn=null; nBot=0; $("nMsg").textContent="0"; $("nCost").textContent="US$0.00";
+  $("sheet").hidden=true;
+  chat.innerHTML='<div class="pill">Escribe cualquier mensaje para iniciar la conversación</div>';
+  ROOT.querySelectorAll(".node").forEach(n=>n.classList.remove("on","now"));
+  $("txt").value="Hola, quiero internet"; pintarHorario();
+}
+$("reset").onclick=reiniciar;
+["hora","dia","cierreSab"].forEach(id=>{ $(id).addEventListener("input",pintarHorario); $(id).addEventListener("change",pintarHorario); });
+$("real").onchange=()=>{ $("hora").disabled=$("dia").disabled=$("real").checked; pintarHorario(); };
+pintarHorario();
+
+})();
+(function(){
+  const vistas={o:document.getElementById("o-root"), m:document.getElementById("m-root"), p:document.getElementById("p-root"), v:document.getElementById("v-root")};
+  function mostrar(k){
+    for(const x in vistas){ vistas[x].hidden = x!==k; document.getElementById("tab-"+x).setAttribute("aria-selected", String(x===k)); }
+  }
+  document.getElementById("tab-m").onclick=()=>mostrar("m");
+  document.getElementById("tab-p").onclick=()=>mostrar("p");
+  document.getElementById("tab-o").onclick=()=>mostrar("o");
+  document.getElementById("tab-v").onclick=()=>mostrar("v");
+  mostrar(location.hash==="#postventa"?"p":location.hash==="#original"?"o":location.hash==="#ventas"?"v":"m");
+})();
+</script>
+
+</body>
+</html>
