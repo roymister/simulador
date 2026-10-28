@@ -242,10 +242,10 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
             </div>
             <div class="flow">
               <div class="lane">Sí · Ventas</div>
-              <div class="node small" data-n="ventas"><b>Futuro Gponlover</b>Pide nombre, DNI y ubicación</div>
+              <div class="node small" data-n="ventas"><b>Futuro Gponlover</b>Pide nombre, DNI/RUC y ubicación</div>
               <div class="node small dec" data-n="horV"><b>¿Horario ventas?</b>L – V 7 am a 10 pm · Sáb <span class="sabTxt">7 am a 1 pm</span></div>
-              <div class="node small" data-n="colaV"><b>Dentro</b>Cola de ventas</div>
-              <div class="node small" data-n="fueraV"><b>Fuera</b>Mensaje fuera de horario → Cola de ventas</div>
+              <div class="node small" data-n="colaV"><b>Dentro</b><span class="colaVTxt">DNI → Cola de ventas · RUC → Cola B2B</span></div>
+              <div class="node small" data-n="fueraV"><b>Fuera</b>Mensaje fuera de horario → <span class="colaVTxt">su cola</span></div>
             </div>
             <div class="flow">
               <div class="lane">No · Contingencia</div>
@@ -586,7 +586,7 @@ const MENSAJES = {
   perfecto: "¡Perfecto! En breve, un asesor especializado te atenderá 🚀\n\nPara agilizar tu consulta, por favor bríndanos lo siguiente:\n1️⃣ DNI/RUC del titular\n2️⃣ Detalle de tu consulta",
   perfectoSoporte: "¡Perfecto! Mientras te asignamos un asesor técnico 🛠️, prueba esto:\n🔌 Apaga tu módem 1 min y vuelve a encenderlo\n💡 Revisa que el cable de fibra esté bien conectado\n🔴 Si ves la luz LOS en rojo, indícanoslo\n\nY envíanos:\n1️⃣ DNI/RUC del titular\n2️⃣ Detalle de tu consulta",
   listo: "¡Listo, Gponlover! 🧡 Recibimos tu información correctamente ✅\n\n📋 Tu consulta ya está en nuestra cola de atención.\n👨‍💻 Un asesor revisará tu caso y te escribirá por este mismo chat.\n\n¡Gracias por confiar en el Poder de la Fibra! 🚀",
-  ventas: "¡Hola, futuro Gponlover! 😎🧡\nQueremos que vivas el verdadero Poder de la Fibra 🚀\n\nPara que un asesor te atienda, déjanos estos datos 👇\n1️⃣ Nombre completo y DNI\n2️⃣ Ubicación donde quieres el servicio 📍",
+  ventas: "¡Hola, futuro Gponlover! 😎🧡\nQueremos que vivas el verdadero Poder de la Fibra 🚀\n\nPara que un asesor te atienda, déjanos estos datos 👇\n1️⃣ Nombre completo y DNI/RUC 🪪\n2️⃣ Comparte tu ubicación 📍 para verificar la cobertura en tu zona 📡",
   ventasDentro: "¡Gracias! ✅ Ya tenemos tus datos.\nEn breve, un asesor comercial te atenderá por este chat 🚀🧡",
   ventasFuera: "🌙 En este momento estamos fuera de nuestro horario de atención:\n🕖 Lunes a viernes: 7:00 am a 10:00 pm\n🕖 Sábados: 7:00 am a {SAB}\n\nYa registramos tus datos ✅ Un asesor te escribirá por este chat apenas iniciemos ⏰🧡",
   contingencia: "Gracias por comunicarte con GPON 🧡, en breve un asesor te estará atendiendo 💙",
@@ -700,15 +700,19 @@ async function datosCliente(){
   else { marcar("gerA"); aviso("Fuera de horario → derivado a: Cola Gerencial"); }
   estado="en_cola";
 }
-async function datosVentas(){
+function esEmpresa(t){ return /\b(10|15|17|20)\d{9}\b/.test(t.replace(/\s/g," ")) || /\bruc\b|empresa|negocio|s\.?a\.?c|e\.?i\.?r\.?l/i.test(t); }
+async function datosVentas(texto){
   estado="ocupado"; $("timer").hidden=true;
+  const emp=esEmpresa(texto||""), cola=emp?"Cola B2B":"Cola de ventas";
+  aviso(emp?"Se detectó RUC → empresa (B2B)":"Se detectó DNI → hogar");
+  ROOT.querySelectorAll(".colaVTxt").forEach(x=>x.textContent=cola);
   marcar("horV"); await espera(600);
-  if(horarioVentas()){ marcar("colaV"); await escribiendo(900); burbuja(MENSAJES.ventasDentro,"bot"); aviso("Dentro de horario de ventas → derivado a: Cola de ventas"); }
+  if(horarioVentas()){ marcar("colaV"); await escribiendo(900); burbuja(MENSAJES.ventasDentro,"bot"); aviso("Dentro de horario de ventas → derivado a: "+cola); }
   else {
     marcar("fueraV");
     await escribiendo(900);
     burbuja(MENSAJES.ventasFuera.replace("{SAB}", fmt12($("cierreSab").value||"13:00")),"bot");
-    aviso("Fuera de horario de ventas → queda en Cola de ventas para la apertura");
+    aviso("Fuera de horario de ventas → queda en "+cola+" para la apertura");
   }
   estado="en_cola";
 }
@@ -719,7 +723,7 @@ function enviar(){
   if(estado==="inicio"){ chat.innerHTML=""; burbuja(v,"user"); iniciar(); return; }
   burbuja(v,"user");
   if(estado==="datosCliente") datosCliente();
-  else if(estado==="datosVentas") datosVentas();
+  else if(estado==="datosVentas") datosVentas(v);
 }
 $("sendBtn").addEventListener("click", enviar);
 $("txt").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); enviar(); } });
